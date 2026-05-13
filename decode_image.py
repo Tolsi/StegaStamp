@@ -1,14 +1,7 @@
-import bchlib
 import glob
 from PIL import Image, ImageOps
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.image
-from tensorflow.python.saved_model import tag_constants
-from tensorflow.python.saved_model import signature_constants
-
-BCH_POLYNOMIAL = 137
-BCH_BITS = 5
 
 def main():
     import argparse
@@ -27,44 +20,30 @@ def main():
         print('Missing input image')
         return
 
-    sess = tf.InteractiveSession(graph=tf.Graph())
-
-    model = tf.saved_model.loader.load(sess, [tag_constants.SERVING], args.model)
-
-    input_image_name = model.signature_def[signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY].inputs['image'].name
-    input_image = tf.get_default_graph().get_tensor_by_name(input_image_name)
-
-    output_secret_name = model.signature_def[signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY].outputs['decoded'].name
-    output_secret = tf.get_default_graph().get_tensor_by_name(output_secret_name)
-
-    bch = bchlib.BCH(BCH_POLYNOMIAL, BCH_BITS)
+    model = tf.saved_model.load(args.model, tags=['serve'])
 
     for filename in files_list:
         image = Image.open(filename).convert("RGB")
-        image = np.array(ImageOps.fit(image,(400, 400)),dtype=np.float32)
-        image /= 255.
-
-        feed_dict = {input_image:[image]}
-
-        secret = sess.run([output_secret],feed_dict=feed_dict)[0][0]
-
-        packet_binary = "".join([str(int(bit)) for bit in secret[:96]])
-        packet = bytes(int(packet_binary[i : i + 8], 2) for i in range(0, len(packet_binary), 8))
-        packet = bytearray(packet)
-
-        data, ecc = packet[:-bch.ecc_bytes], packet[-bch.ecc_bytes:]
-
-        bitflips = bch.decode_inplace(data, ecc)
-
-        if bitflips != -1:
-            try:
-                code = data.decode("utf-8")
-                print(filename, code)
-                continue
-            except:
-                continue
-        print(filename, 'Failed to decode')
-
+        image = ImageOps.fit(image, (400, 400))
+        image_np = np.array(image, dtype=np.float32) / 255.0
+        image_np = np.expand_dims(image_np, axis=0)
+        
+        result = model.signatures['serving_default'](
+            image=tf.constant(image_np),
+            secret=tf.zeros((1, 100), dtype=tf.float32)
+        )
+        
+        secret = result['decoded'].numpy()[0]
+        
+        bits = ''.join(['1' if b > 0.5 else '0' for b in secret[:100]])
+        chars = []
+        for i in range(0, len(bits), 8):
+            byte = bits[i:i+8]
+            if len(byte) == 8:
+                chars.append(chr(int(byte, 2)))
+        
+        decoded = ''.join(chars).strip()
+        print(f"{filename}: {decoded}")
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,10 @@
 import os,time,cv2, sys, math
 import bchlib
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 import argparse
 import numpy as np
-import tensorflow.contrib.image
+# import tensorflow.contrib.image  # TensorFlow 2.x
 from tensorflow.python.saved_model import tag_constants
 from tensorflow.python.saved_model import signature_constants
 
@@ -52,7 +53,7 @@ def main():
     decoder_graph = tf.Graph()
 
     with detector_graph.as_default():
-        detector_sess = tf.Session()
+        detector_sess = tf.compat.v1.Session()
         detector_model = tf.saved_model.loader.load(detector_sess, [tag_constants.SERVING], args.detector_model)
 
         detector_input_name = detector_model.signature_def[signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY].inputs['image'].name
@@ -62,7 +63,7 @@ def main():
         detector_output = detector_graph.get_tensor_by_name(detector_output_name)
 
     with decoder_graph.as_default():
-        decoder_sess = tf.Session()
+        decoder_sess = tf.compat.v1.Session()
         decoder_model = tf.saved_model.loader.load(decoder_sess, [tag_constants.SERVING], args.decoder_model)
 
         decoder_input_name = decoder_model.signature_def[signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY].inputs['image'].name
