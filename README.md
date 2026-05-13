@@ -82,10 +82,12 @@ Train model:
 bash scripts/base.sh EXP_NAME
 ```
 
-## Performance
-- Encoding time: ~11 sec (CPU), ~6 sec (with GPU)
+## Performance (Apple M1)
+- Encoding time: ~11 sec (CPU), ~6 sec (GPU via Metal)
 - Decoding time: ~11 sec (CPU)
 - Message capacity: 7 characters (56 bits)
+
+Note: TensorFlow Metal GPU acceleration requires TensorFlow 2.x (not supported with tf.Session-based code).
 
 ## Requirements
 - Python 3.9+
